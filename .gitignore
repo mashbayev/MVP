@@ -1,0 +1,18 @@
+# build
+/bin/
+/dist/
+/tmp/
+
+# IDE
+.vscode/
+.idea/
+
+# deps
+vendor/
+
+# local configs & secrets
+configs/config.yaml
+.env
+.env.*
+*.local.*
+*.secret.*
