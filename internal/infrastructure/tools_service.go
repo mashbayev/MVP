@@ -6,16 +6,22 @@ import (
 	"log"
 	"time"
 
-	"whatsapp-analytics-mvp/internal/core"
+	"whatsapp-analytics-mvp/internal/models"
 )
 
 // ToolsService — основная бизнес-логика для инструментов, вызываемых LLM.
 type ToolsService struct {
-	DB core.ContextManager
+	DB bookingStore
 }
 
 // NewToolsService — создаёт сервис инструментов.
-func NewToolsService(db core.ContextManager) *ToolsService {
+// bookingStore — minimal interface required by ToolsService (booking operations).
+type bookingStore interface {
+	GetBookingsAt(ctx context.Context, t time.Time) ([]models.Booking, error)
+	SaveBooking(ctx context.Context, bookingID, clientID string, start time.Time, seats, hours int, amountStr string) error
+}
+
+func NewToolsService(db bookingStore) *ToolsService {
 	return &ToolsService{DB: db}
 }
 

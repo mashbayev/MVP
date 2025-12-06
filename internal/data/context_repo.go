@@ -223,6 +223,63 @@ func (r *SQLiteContextRepo) getRelevantHistory(ctx context.Context, clientID str
 }
 
 // -----------------------------------------------------------------------------
+// CREATE OR UPDATE SESSION
+// -----------------------------------------------------------------------------
+
+// GetChatHistory — возвращает историю сообщений клиента (последние 24 часа).
+func (r *SQLiteContextRepo) GetChatHistory(ctx context.Context, clientID string) ([]map[string]string, error) {
+	cutoff := time.Now().Add(-24 * time.Hour)
+
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT timestamp, sender, message_text
+		FROM messages
+		WHERE client_id = ? AND timestamp >= ?
+		ORDER BY timestamp ASC
+	`, clientID, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []map[string]string
+	for rows.Next() {
+		var ts time.Time
+		var sender, text string
+		if err := rows.Scan(&ts, &sender, &text); err != nil {
+			continue
+		}
+		out = append(out, map[string]string{
+			"timestamp": ts.Format("2006-01-02 15:04:05"),
+			"sender":    sender,
+			"text":      text,
+		})
+	}
+	return out, nil
+}
+
+// CreateOrUpdateSession — создаёт или обновляет сессию клиента.
+func (r *SQLiteContextRepo) CreateOrUpdateSession(
+	ctx context.Context,
+	clientID string,
+	bookingID *string,
+) error {
+	// MVP stab: можно просто логировать или игнорировать
+	// В будущем здесь будет реальная логика работы с таблицей sessions
+	if bookingID != nil {
+		_, err := r.DB.ExecContext(ctx, `
+			INSERT OR REPLACE INTO sessions (client_id, booking_id, started_at, expires_at)
+			VALUES (?, ?, CURRENT_TIMESTAMP, datetime('now', '+24 hours'))
+		`, clientID, *bookingID)
+		return err
+	}
+	_, err := r.DB.ExecContext(ctx, `
+		INSERT OR REPLACE INTO sessions (client_id, started_at, expires_at)
+		VALUES (?, CURRENT_TIMESTAMP, datetime('now', '+24 hours'))
+	`, clientID)
+	return err
+}
+
+// -----------------------------------------------------------------------------
 // BUSINESS SETTINGS
 // -----------------------------------------------------------------------------
 

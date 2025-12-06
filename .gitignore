@@ -2,6 +2,10 @@
 /bin/
 /dist/
 /tmp/
+main
+*.exe
+*.dll
+*.so
 
 # IDE
 .vscode/
@@ -12,7 +16,19 @@ vendor/
 
 # local configs & secrets
 configs/config.yaml
+configs/config.*.backup
 .env
-.env.*
-*.local.*
+.env.local
+.env.*.local
 *.secret.*
+
+# databases
+*.db
+*.sqlite
+*.sqlite3
+data/
+db/
+
+# logs
+logs/
+*.log

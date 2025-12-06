@@ -94,7 +94,13 @@ func (e *LLMEngine) callOpenAI(ctx context.Context, systemPrompt, userPrompt str
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Tools: tools,
+	}
+
+	// Convert tools if provided (genai.Tool -> openai.Tool)
+	if tools != nil {
+		if toolList, ok := tools.([]*genai.Tool); ok {
+			req.Tools = genaiToolsToOpenAI(toolList)
+		}
 	}
 
 	resp, err := e.openaiClient.CreateChatCompletion(ctx, req)
@@ -127,7 +133,7 @@ func (e *LLMEngine) callGemini(ctx context.Context, systemPrompt, userPrompt str
 		return "", errors.New("Gemini вернул пустой fallback ответ")
 	}
 
-	for _, p := range resp.Candidates[0].Content.Pparts {
+	for _, p := range resp.Candidates[0].Content.Parts {
 		if txt, ok := p.(genai.Text); ok {
 			return string(txt), nil
 		}
@@ -152,4 +158,70 @@ func isUnavailable(err error) bool {
 	return strings.Contains(err.Error(), "unavailable") ||
 		strings.Contains(err.Error(), "try again") ||
 		strings.Contains(err.Error(), "timeout")
+}
+
+// genaiToolsToOpenAI converts genai.Tool list to openai.Tool list
+func genaiToolsToOpenAI(genaiTools []*genai.Tool) []openai.Tool {
+	if len(genaiTools) == 0 {
+		return nil
+	}
+
+	var result []openai.Tool
+	for _, gt := range genaiTools {
+		if gt == nil {
+			continue
+		}
+
+		// Convert each FunctionDeclaration to openai.Tool
+		for _, fd := range gt.FunctionDeclarations {
+			if fd == nil {
+				continue
+			}
+
+			tool := openai.Tool{
+				Type: openai.ToolTypeFunction,
+				Function: &openai.FunctionDefinition{
+					Name:        fd.Name,
+					Description: fd.Description,
+					Parameters:  schemaToJSON(fd.Parameters),
+				},
+			}
+			result = append(result, tool)
+		}
+	}
+
+	return result
+}
+
+// schemaToJSON converts genai.Schema to openai-compatible JSON schema
+func schemaToJSON(schema *genai.Schema) interface{} {
+	if schema == nil {
+		return nil
+	}
+
+	result := map[string]interface{}{
+		"type": "object",
+	}
+
+	// genai.Type is not comparable with a plain string in some versions,
+	// use fmt.Sprint to safely stringify the enum/value.
+	result["type"] = fmt.Sprint(schema.Type)
+
+	if schema.Description != "" {
+		result["description"] = schema.Description
+	}
+
+	if len(schema.Properties) > 0 {
+		props := make(map[string]interface{})
+		for key, prop := range schema.Properties {
+			props[key] = schemaToJSON(prop)
+		}
+		result["properties"] = props
+	}
+
+	if len(schema.Required) > 0 {
+		result["required"] = schema.Required
+	}
+
+	return result
 }

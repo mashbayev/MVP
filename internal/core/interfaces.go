@@ -16,7 +16,7 @@ import (
 
 // LLMProvider — единый интерфейс для всех движков (OpenAI, Gemini, Hybrid).
 type LLMProvider interface {
-	Generate(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+	Generate(ctx context.Context, systemPrompt, userPrompt string, tools any) (string, error, bool)
 }
 
 //
